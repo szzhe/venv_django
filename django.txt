@@ -1,0 +1,185 @@
+
+1.windows下新建虚拟环境,cmd定位到某个具体目录下：
+python -m venv venv_django
+
+2.在venv_django目录下新建magedu_django的文件夹
+
+3.pycharm打开magedu_django，标记为项目。
+且，Setting->Project:szzhe->Project Interpreter->magedu_django，Add local，定位到venv_django\Script\python.exe
+
+4.Terminal命令行，切换到venv_magedu\Script，安装django
+Scripts\python.exe -m pip install django==1.11
+
+5.Python Console
+
+Setting->Build,Execution,Deployment->Console->Python Console
+[Project]：magedu_django
+[Python interpreter]:Python 3.6.2 virtualenv at D:\venv_django
+[Start scripy]:
+import sys; print('Python %s on %s' % (sys.version, sys.platform))
+sys.path.extend([WORKING_DIR_AND_PYTHON_PATHS])
+
+变更路径后，重启Pycharm
+
+6.Terminal
+
+Tools->Terminal
+[Start directory] D:\venv_django\magedu_django
+
+-------------------------------------------------------------------------------------
+启动虚拟环境：Scripts\activate.bat
+退出虚拟环境：Scripts\deactivate.bat
+
+查看已有的模块：pip list
+
+#激活virtualenv环境
+1.Terminal,创建Django项目
+..\Script\django-admin.exe startproject django_base
+
+2.启动Django
+..\Scripts\python.exe django_base\manage.py runserver
+
+'''显示如下即为成功：
+It worked!
+Congratulations on your first Django-powered page
+'''
+注解：127.0.0.1为个人访问，可配置manage.py runserver 0.0.0.0:8000共享给所有人访问
+
+补充：也可以通过pycharm设置
+
+1)Run->Edit Configurations
+2)增加django server，Name:django_base,可设置Host:0.0.0.0,
+[Working directory] D:\venv_django\magedu_django\django_base
+3)点Apply时，当前窗口底部会显示：Error:Please enable Django support for thr project，点Fix进入
+4)选择magedu_django项目，勾选Enable Django Support；
+Django project root：D:\venv_django\magedu_django\django_base，这时，Manager script会自动读取manage.py出来
+5)Settings：django_base\settings.py
+6)Apply,OK,OK
+
+注意：需修改django_base\settings.py   修改 ALLOWED_HOSTS = ['*'] # 一般指向nginx
+访问地址：192.168.0.104:8080
+
+-------------------------------------------------------------------------------------
+
+1.新建app 
+D:\venv_django\magedu_django\django_base>
+..\..\Scripts\python.exe manage.py startapp polls
+
+2.修改polls下views.py
+from django.http import HttpResponse
+
+def index(request):
+    return HttpResponse('Hello world, this is django==1.11')
+
+3.polls下新建urls.py
+
+from django.conf.urls import url
+from . import views
+
+urlpatterns = [
+    url(r'^$', views.index, name='index')
+]
+
+4.修改django_base\urls.py
+urlpatterns = [
+    url(r'^admin/', admin.site.urls),
+    url(r'^polls/', include('polls.urls')), # 此处为新增项
+]
+
+5.修改settings下database信息
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+修改为：
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'magedu',
+        'HOST': '127.0.0.1',
+        'USER': 'root',
+        'PASSWORD': 'qwe123',
+        'PORT': 3306,
+    }
+}
+
+备注:安装pymysql
+(venv_django) D:\venv_django\magedu_django\django_base>..\..\Scripts\python.exe -m pip install pymysql
+
+修改django默认识别的数据库：django_base\__init__.py
+import pymysql
+pymysql.install_as_MySQLdb()
+
+总结：上述执行完毕后，Debug不会产生任何错误
+
+6.Terminal
+(venv_django) D:\venv_django\magedu_django>..\Scripts\python.exe django_base\manage.py migrate
+
+Navicat查看localhost->magedu，自动加载出10个表列
+
+7.polls下修改models.py，详情见具体场景
+
+8.重新执行步骤6，发现 No migrations to apply.
+此时，需要编辑django_base\settings，在INSTALLED_APPS最开始加上 'polls.apps.PollsConfig',保存后，查看Debug，会发现重新加载运行过
+
+9.Terminal
+(venv_django) D:\venv_django\magedu_django>..\Scripts\python.exe django_base\manage.py makemigrations polls
+
+10.Terminal 用来检查
+(venv_django) D:\venv_django\magedu_django>..\Scripts\python.exe django_base\manage.py sqlmigrate polls 0001
+
+BEGIN;
+--
+-- Create model Choice
+--
+CREATE TABLE `polls_choice` (`id` integer AUTO_INCREMENT NOT NULL PRIMARY KEY, `choice_text` varchar(200) NOT NULL, `votes` integer NOT NULL);
+--
+-- Create model Question
+--
+CREATE TABLE `polls_question` (`id` integer AUTO_INCREMENT NOT NULL PRIMARY KEY, `question_text` varchar(200) NOT NULL, `pub_date` date NOT NULL);
+--
+-- Add field question to choice
+--
+ALTER TABLE `polls_choice` ADD COLUMN `question_id` integer NOT NULL;
+ALTER TABLE `polls_choice` ADD CONSTRAINT `polls_choice_question_id_c5b4b260_fk_polls_question_id` FOREIGN KEY (`question_id`) REFERENCES `polls_question` (`id`);
+COMMIT;
+
+11.重新执行步骤6，发现 
+(venv_django) D:\venv_django\magedu_django>..\Scripts\python.exe django_base\manage.py migrate
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, polls, sessions
+Running migrations:
+  Applying polls.0001_initial... OK
+
+重点：Navicat->localhost->magedu下，会多出polls_choice、polls_question两个表
+
+如果想自定义表明，需要修改polls\models.py ，具体方法中增加：
+class Question(models.Model):
+    class Meta:
+        db_table = "question"
+class Choice(models.Model):
+    class Meta:
+        db_table = 'choice'
+        
+重新执行步骤->重新执行步骤10->重新执行步骤6，此时数据库表明会发生变更：polls_question ==》 question   polls_choice ==> choice
+
+【稍微总结下】
+1.polls\views -> polls\urls -> django_base\urls
+2.数据存放，在django_base\settings设置DATABASES[mysql]
+3.polls\model，在django_base\settings下设置INSTALLED_APPS['polls.apps.PollsConfig',] -- 注册app
+4.执行migrate，生成数据
+-------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
